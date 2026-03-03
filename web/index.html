@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>链上拼单管理台</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="bg-blur"></div>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">动态分摊拼单</p>
+          <h1>拼单管理与用户门户</h1>
+          <p class="sub">
+            可在一个页面完成：发布预热活动、收集授权、创建链上拼单、参与/退款/结算管理。
+          </p>
+        </div>
+        <div class="wallet-box">
+          <button id="connectWalletBtn" class="primary">连接钱包</button>
+          <div id="walletInfo" class="muted">钱包未连接</div>
+        </div>
+      </header>
+
+      <section class="panel">
+        <h2>默认配置</h2>
+        <div class="grid-3">
+          <label>
+            Factory 地址
+            <input id="defaultFactoryAddress" placeholder="0x..." />
+          </label>
+          <label>
+            Token 地址
+            <input id="defaultTokenAddress" placeholder="0x..." />
+          </label>
+          <label>
+            Token 符号
+            <input id="defaultTokenSymbol" value="USDT" />
+          </label>
+          <label>
+            Token 精度
+            <input id="defaultTokenDecimals" type="number" value="18" min="0" max="36" />
+          </label>
+        </div>
+        <button id="saveDefaultsBtn" class="secondary">保存默认配置</button>
+      </section>
+
+      <section class="panel">
+        <h2>创建预热活动</h2>
+        <form id="campaignForm" class="grid-3">
+          <label>
+            活动标题
+            <input id="campaignTitle" required placeholder="例如：iPhone 拼单采购" />
+          </label>
+          <label>
+            总价（人类可读单位）
+            <input id="campaignTotalCost" required placeholder="100" />
+          </label>
+          <label>
+            截止时间
+            <input id="campaignDeadline" required type="datetime-local" />
+          </label>
+          <label class="full">
+            活动描述
+            <textarea id="campaignDescription" rows="2" placeholder="填写活动说明、商品信息等"></textarea>
+          </label>
+          <label>
+            最小成团人数
+            <input id="campaignMinParticipants" required type="number" value="2" min="1" />
+          </label>
+          <label>
+            目标人数（0 = 不限制）
+            <input id="campaignTargetParticipants" required type="number" value="0" min="0" />
+          </label>
+          <label>
+            最大人数（0 = 不限）
+            <input id="campaignMaxParticipants" required type="number" value="0" min="0" />
+          </label>
+          <label>
+            批量退款单次上限
+            <input id="campaignMaxBatchSize" required type="number" value="100" min="1" />
+          </label>
+          <label>
+            管理员地址
+            <input id="campaignAdminAddress" placeholder="0x..." required />
+          </label>
+          <label>
+            商家地址
+            <input id="campaignMerchantAddress" placeholder="0x..." required />
+          </label>
+          <label>
+            Factory 地址（覆盖默认）
+            <input id="campaignFactoryAddress" placeholder="0x..." />
+          </label>
+          <label>
+            Token 地址（覆盖默认）
+            <input id="campaignTokenAddress" placeholder="0x..." />
+          </label>
+          <label>
+            Token 符号（覆盖默认）
+            <input id="campaignTokenSymbol" placeholder="USDT" />
+          </label>
+          <label>
+            Token 精度（覆盖默认）
+            <input id="campaignTokenDecimals" type="number" min="0" max="36" placeholder="18" />
+          </label>
+          <button class="primary full" type="submit">创建活动</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="row">
+          <h2>活动列表</h2>
+          <button id="refreshCampaignsBtn" class="secondary">刷新列表</button>
+        </div>
+        <div id="campaignList" class="campaign-list"></div>
+      </section>
+
+      <section class="panel">
+        <h2>操作日志</h2>
+        <pre id="logs" class="logs"></pre>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,368 @@
+{
+  "_format": "ethers-rs-sol-cache-3",
+  "paths": {
+    "artifacts": "out",
+    "build_infos": "out/build-info",
+    "sources": "src",
+    "tests": "test",
+    "scripts": "script",
+    "libraries": [
+      "lib"
+    ]
+  },
+  "files": {
+    "src/DynamicCostSharingRound.sol": {
+      "lastModificationDate": 1772546992105,
+      "contentHash": "7fbceb09147eff273a3955c1729b5ad7",
+      "sourceName": "src/DynamicCostSharingRound.sol",
+      "solcConfig": {
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "metadata": {
+            "bytecodeHash": "ipfs",
+            "appendCBOR": true
+          },
+          "outputSelection": {
+            "*": {
+              "": [
+                "ast"
+              ],
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ]
+            }
+          },
+          "evmVersion": "paris",
+          "libraries": {}
+        }
+      },
+      "imports": [
+        "src/interfaces/IERC20.sol",
+        "src/libraries/SafeERC20Lite.sol",
+        "src/utils/ReentrancyGuard.sol"
+      ],
+      "versionRequirement": "^0.8.20",
+      "artifacts": {
+        "DynamicCostSharingRound": {
+          "0.8.20+commit.a1b79de6.Linux.gcc": "DynamicCostSharingRound.sol/DynamicCostSharingRound.json"
+        }
+      }
+    },
+    "src/GroupBuyFactory.sol": {
+      "lastModificationDate": 1772546985421,
+      "contentHash": "6bfce63d28b8a245e7c69be61d031bd6",
+      "sourceName": "src/GroupBuyFactory.sol",
+      "solcConfig": {
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "metadata": {
+            "bytecodeHash": "ipfs",
+            "appendCBOR": true
+          },
+          "outputSelection": {
+            "*": {
+              "": [
+                "ast"
+              ],
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ]
+            }
+          },
+          "evmVersion": "paris",
+          "libraries": {}
+        }
+      },
+      "imports": [
+        "src/DynamicCostSharingRound.sol",
+        "src/interfaces/IERC20.sol",
+        "src/libraries/SafeERC20Lite.sol",
+        "src/utils/ReentrancyGuard.sol"
+      ],
+      "versionRequirement": "^0.8.20",
+      "artifacts": {
+        "GroupBuyFactory": {
+          "0.8.20+commit.a1b79de6.Linux.gcc": "GroupBuyFactory.sol/GroupBuyFactory.json"
+        }
+      }
+    },
+    "src/interfaces/IERC20.sol": {
+      "lastModificationDate": 1772540491954,
+      "contentHash": "686d71d2e5d9a3568dcc28b5fe050867",
+      "sourceName": "src/interfaces/IERC20.sol",
+      "solcConfig": {
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "metadata": {
+            "bytecodeHash": "ipfs",
+            "appendCBOR": true
+          },
+          "outputSelection": {
+            "*": {
+              "": [
+                "ast"
+              ],
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ]
+            }
+          },
+          "evmVersion": "paris",
+          "libraries": {}
+        }
+      },
+      "imports": [],
+      "versionRequirement": "^0.8.20",
+      "artifacts": {
+        "IERC20": {
+          "0.8.20+commit.a1b79de6.Linux.gcc": "IERC20.sol/IERC20.json"
+        },
+        "IERC20Metadata": {
+          "0.8.20+commit.a1b79de6.Linux.gcc": "IERC20.sol/IERC20Metadata.json"
+        }
+      }
+    },
+    "src/libraries/SafeERC20Lite.sol": {
+      "lastModificationDate": 1772540491950,
+      "contentHash": "0f72393f2048e3158e024384d9b8d55c",
+      "sourceName": "src/libraries/SafeERC20Lite.sol",
+      "solcConfig": {
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "metadata": {
+            "bytecodeHash": "ipfs",
+            "appendCBOR": true
+          },
+          "outputSelection": {
+            "*": {
+              "": [
+                "ast"
+              ],
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ]
+            }
+          },
+          "evmVersion": "paris",
+          "libraries": {}
+        }
+      },
+      "imports": [
+        "src/interfaces/IERC20.sol"
+      ],
+      "versionRequirement": "^0.8.20",
+      "artifacts": {
+        "SafeERC20Lite": {
+          "0.8.20+commit.a1b79de6.Linux.gcc": "SafeERC20Lite.sol/SafeERC20Lite.json"
+        }
+      }
+    },
+    "src/mocks/FeeOnTransferMockERC20.sol": {
+      "lastModificationDate": 1772540491954,
+      "contentHash": "4d0cd71eea42827f31a9d5f65874ab3c",
+      "sourceName": "src/mocks/FeeOnTransferMockERC20.sol",
+      "solcConfig": {
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "metadata": {
+            "bytecodeHash": "ipfs",
+            "appendCBOR": true
+          },
+          "outputSelection": {
+            "*": {
+              "": [
+                "ast"
+              ],
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ]
+            }
+          },
+          "evmVersion": "paris",
+          "libraries": {}
+        }
+      },
+      "imports": [
+        "src/interfaces/IERC20.sol",
+        "src/mocks/MockERC20.sol"
+      ],
+      "versionRequirement": "^0.8.20",
+      "artifacts": {
+        "FeeOnTransferMockERC20": {
+          "0.8.20+commit.a1b79de6.Linux.gcc": "FeeOnTransferMockERC20.sol/FeeOnTransferMockERC20.json"
+        }
+      }
+    },
+    "src/mocks/MockERC20.sol": {
+      "lastModificationDate": 1772540491954,
+      "contentHash": "40c50ceac3f0626273ce087c9c6256c7",
+      "sourceName": "src/mocks/MockERC20.sol",
+      "solcConfig": {
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "metadata": {
+            "bytecodeHash": "ipfs",
+            "appendCBOR": true
+          },
+          "outputSelection": {
+            "*": {
+              "": [
+                "ast"
+              ],
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ]
+            }
+          },
+          "evmVersion": "paris",
+          "libraries": {}
+        }
+      },
+      "imports": [
+        "src/interfaces/IERC20.sol"
+      ],
+      "versionRequirement": "^0.8.20",
+      "artifacts": {
+        "MockERC20": {
+          "0.8.20+commit.a1b79de6.Linux.gcc": "MockERC20.sol/MockERC20.json"
+        }
+      }
+    },
+    "src/utils/ReentrancyGuard.sol": {
+      "lastModificationDate": 1772540491950,
+      "contentHash": "634492c6a64835cbc47958a408b4ebe4",
+      "sourceName": "src/utils/ReentrancyGuard.sol",
+      "solcConfig": {
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "metadata": {
+            "bytecodeHash": "ipfs",
+            "appendCBOR": true
+          },
+          "outputSelection": {
+            "*": {
+              "": [
+                "ast"
+              ],
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ]
+            }
+          },
+          "evmVersion": "paris",
+          "libraries": {}
+        }
+      },
+      "imports": [],
+      "versionRequirement": "^0.8.20",
+      "artifacts": {
+        "ReentrancyGuard": {
+          "0.8.20+commit.a1b79de6.Linux.gcc": "ReentrancyGuard.sol/ReentrancyGuard.json"
+        }
+      }
+    },
+    "test/DynamicCostSharing.t.sol": {
+      "lastModificationDate": 1772547068065,
+      "contentHash": "60edf9f5d39c65f31b34efa5aaf9b87b",
+      "sourceName": "test/DynamicCostSharing.t.sol",
+      "solcConfig": {
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "metadata": {
+            "bytecodeHash": "ipfs",
+            "appendCBOR": true
+          },
+          "outputSelection": {
+            "*": {
+              "": [
+                "ast"
+              ],
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ]
+            }
+          },
+          "evmVersion": "paris",
+          "libraries": {}
+        }
+      },
+      "imports": [
+        "src/DynamicCostSharingRound.sol",
+        "src/GroupBuyFactory.sol",
+        "src/interfaces/IERC20.sol",
+        "src/libraries/SafeERC20Lite.sol",
+        "src/mocks/FeeOnTransferMockERC20.sol",
+        "src/mocks/MockERC20.sol",
+        "src/utils/ReentrancyGuard.sol"
+      ],
+      "versionRequirement": "^0.8.20",
+      "artifacts": {
+        "DynamicCostSharingTest": {
+          "0.8.20+commit.a1b79de6.Linux.gcc": "DynamicCostSharing.t.sol/DynamicCostSharingTest.json"
+        },
+        "RoundCaller": {
+          "0.8.20+commit.a1b79de6.Linux.gcc": "DynamicCostSharing.t.sol/RoundCaller.json"
+        },
+        "Vm": {
+          "0.8.20+commit.a1b79de6.Linux.gcc": "DynamicCostSharing.t.sol/Vm.json"
+        }
+      }
+    }
+  }
+}

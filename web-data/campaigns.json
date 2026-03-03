@@ -1,0 +1,65 @@
+{
+  "campaigns": [
+    {
+      "id": "camp_1772543705536_sw9psw",
+      "title": "dddd_pool月卡",
+      "description": "dddd_pool月卡",
+      "tokenSymbol": "USDT",
+      "tokenDecimals": 18,
+      "totalCost": "500000000000000000000",
+      "minParticipants": "1",
+      "targetParticipants": "0",
+      "maxParticipants": "0",
+      "maxBatchSize": "100",
+      "deadline": "1774756800",
+      "factoryAddress": "0x0327495b61ee76fbdfea6315e4980681a1e109a5",
+      "tokenAddress": "0xf1cdf168166ebc25d8694fd67ee9c49f12fa96ad",
+      "adminAddress": "0xcd7cbc2838c58380ed3f6f791c7546a51f220be3",
+      "merchantAddress": "0xcd7cbc2838c58380ed3f6f791c7546a51f220be3",
+      "createdAt": "2026-03-03T13:15:05.536Z",
+      "updatedAt": "2026-03-03T13:15:05.536Z",
+      "status": "draft",
+      "roundAddress": "",
+      "roundCreateTxHash": "",
+      "registrations": []
+    },
+    {
+      "id": "camp_1772544036735_7lmxtn",
+      "title": "dddd_pool月卡",
+      "description": "dddd_pool月卡",
+      "tokenSymbol": "USDT",
+      "tokenDecimals": 18,
+      "totalCost": "500000000000000000000",
+      "minParticipants": "1",
+      "targetParticipants": "0",
+      "maxParticipants": "0",
+      "maxBatchSize": "100",
+      "deadline": "1774756800",
+      "factoryAddress": "0x0327495b61ee76fbdfea6315e4980681a1e109a5",
+      "tokenAddress": "0xf1cdf168166ebc25d8694fd67ee9c49f12fa96ad",
+      "adminAddress": "0xcd7cbc2838c58380ed3f6f791c7546a51f220be3",
+      "merchantAddress": "0xcd7cbc2838c58380ed3f6f791c7546a51f220be3",
+      "createdAt": "2026-03-03T13:20:36.735Z",
+      "updatedAt": "2026-03-03T13:27:38.595Z",
+      "status": "onchain",
+      "roundAddress": "0x28125cb73295f57437fbc4b03a3c44c709b898ba",
+      "roundCreateTxHash": "0x91099c4481e34661607388c5ab9301e00fdb77a7cf4acee5ca9a7cf27b14a047",
+      "registrations": [
+        {
+          "address": "0xcd7cbc2838c58380ed3f6f791c7546a51f220be3",
+          "approvalAmount": "500000000000000000000",
+          "approvalTxHash": "0x149fe610a4ffaf5d3a8018d839f942346d5974ad4524f28e1c35013171cf1768",
+          "registeredAt": "2026-03-03T13:21:24.599Z",
+          "updatedAt": "2026-03-03T13:21:24.599Z"
+        },
+        {
+          "address": "0x7a1bb9d903a8bb0a3f0514e7802a44da7223ad88",
+          "approvalAmount": "250000000000000000000",
+          "approvalTxHash": "0x6b373a9686310d6d9d8a3c1b18007703a25f3406331020ae6ef2d116f1948e08",
+          "registeredAt": "2026-03-03T13:21:50.599Z",
+          "updatedAt": "2026-03-03T13:21:50.599Z"
+        }
+      ]
+    }
+  ]
+}
