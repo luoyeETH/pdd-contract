@@ -28,6 +28,8 @@ This repository includes:
 - Safe ERC20 calls + exact-transfer-in checks.
 - Join race protection (`expectedCount` + `maxQuote`).
 - EOA-only restrictions (`msg.sender == tx.origin`) on key external methods.
+- Backend write APIs require wallet signature verification (`cast wallet verify`) with nonce + timestamp anti-replay.
+- Backend write path is serialized with an in-process lock to avoid JSON file concurrent overwrite races.
 
 ### Important compatibility caveat
 
@@ -85,6 +87,10 @@ Then open:
 
 ## 5) Notes
 
-- The backend in this repo is intentionally lightweight and has no authentication.
-- For production, add auth, signature-based admin actions, and database-backed persistence.
+- The backend is intentionally lightweight and file-backed (`web-data/campaigns.json`), not a replacement for a production DB.
+- Write APIs now require client wallet signatures. Ensure Foundry `cast` is available on the backend host.
+- Optional env vars:
+  - `AUTH_MAX_SKEW_SECONDS` (default `300`)
+  - `AUTH_NONCE_TTL_SECONDS` (default `900`)
+  - `MAX_REGISTRATIONS_PER_CAMPAIGN` (default `5000`)
 - Keep approvals scoped (avoid unnecessary unlimited allowance for users).

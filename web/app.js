@@ -39,6 +39,7 @@ const DEFAULTS_KEY = "dcs.defaults.v1";
 const API_BASE = window.location.pathname.startsWith("/groupbuy") ? "/groupbuy-api" : "";
 const REQUIRED_CHAIN_ID = 97n; // BSC Testnet
 const REQUIRED_CHAIN_NAME = "BSC 测试网";
+const AUTH_MESSAGE_PREFIX = "DCS_AUTH_V1";
 
 const state = {
   provider: null,
@@ -160,13 +161,18 @@ function readDefaultsFromUi() {
 }
 
 async function api(path, options = {}) {
+  const { authAction = "", ...fetchOptions } = options;
+  const bodyRaw = typeof fetchOptions.body === "string" ? fetchOptions.body : "";
+  const authHeaders = authAction ? await buildSignedAuthHeaders(authAction, bodyRaw) : {};
+
   const normalizedPath = API_BASE ? path.replace(/^\/api/, "") : path;
   const response = await fetch(`${API_BASE}${normalizedPath}`, {
     headers: {
       "content-type": "application/json",
-      ...(options.headers || {}),
+      ...authHeaders,
+      ...(fetchOptions.headers || {}),
     },
-    ...options,
+    ...fetchOptions,
   });
 
   const payload = await response.json().catch(() => ({}));
@@ -175,6 +181,36 @@ async function api(path, options = {}) {
   }
 
   return payload;
+}
+
+function buildAuthMessage({ action, timestamp, nonce, body }) {
+  return [AUTH_MESSAGE_PREFIX, `action:${action}`, `timestamp:${timestamp}`, `nonce:${nonce}`, "body:", body].join("\n");
+}
+
+async function buildSignedAuthHeaders(action, body) {
+  if (!state.signer || !state.account) {
+    throw new Error("请先连接钱包以完成请求签名");
+  }
+
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const nonceBase = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID().replaceAll("-", "")
+    : `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+  const nonce = nonceBase.slice(0, 64);
+  const message = buildAuthMessage({
+    action,
+    timestamp,
+    nonce,
+    body,
+  });
+
+  const signature = await state.signer.signMessage(message);
+  return {
+    "x-auth-address": state.account,
+    "x-auth-signature": signature,
+    "x-auth-timestamp": timestamp,
+    "x-auth-nonce": nonce,
+  };
 }
 
 function toBigInt(value) {
@@ -441,9 +477,30 @@ async function submitCampaign(event) {
       tokenDecimals,
     };
 
+    await ensureNetworkAndContracts({
+      tokenAddress: payload.tokenAddress,
+      factoryAddress: payload.factoryAddress,
+    });
+
+    const [adminCode, merchantCode] = await Promise.all([
+      state.provider.getCode(payload.adminAddress),
+      state.provider.getCode(payload.merchantAddress),
+    ]);
+    if (adminCode !== "0x") {
+      throw new Error("管理员地址必须是 EOA（当前为合约地址，后续 onlyEOA 会导致操作失败）");
+    }
+    if (merchantCode !== "0x") {
+      throw new Error("商家地址必须是 EOA（当前为合约地址，后续 onlyEOA 会导致提取失败）");
+    }
+
+    if (!accountMatches(payload.adminAddress)) {
+      throw new Error(`创建活动需使用管理员钱包签名: ${payload.adminAddress}`);
+    }
+
     await api("/api/campaigns", {
       method: "POST",
       body: JSON.stringify(payload),
+      authAction: "campaigns:create",
     });
 
     log(`活动已创建: ${payload.title}`);
@@ -492,6 +549,7 @@ async function approveAndRegister(campaign) {
       approvalAmount: amount.toString(),
       approvalTxHash,
     }),
+    authAction: `campaigns:${campaign.id}:register`,
   });
 
   log(`登记完成: ${campaign.title}`);
@@ -576,6 +634,7 @@ async function createRound(campaign) {
       roundAddress,
       roundCreateTxHash: tx.hash,
     }),
+    authAction: `campaigns:${campaign.id}:mark-onchain`,
   });
 
   log(`链上拼单创建成功: ${roundAddress}`);

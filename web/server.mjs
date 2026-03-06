@@ -2,6 +2,8 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promises as fs } from "node:fs";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,6 +16,14 @@ const HOST = process.env.HOST ?? "0.0.0.0";
 const PORT = Number(process.env.PORT ?? 3000);
 
 const MAX_BODY_BYTES = 1024 * 1024;
+const AUTH_MESSAGE_PREFIX = "DCS_AUTH_V1";
+const AUTH_MAX_SKEW_SECONDS = Number(process.env.AUTH_MAX_SKEW_SECONDS ?? 300);
+const AUTH_NONCE_TTL_MS = Number(process.env.AUTH_NONCE_TTL_SECONDS ?? 900) * 1000;
+const MAX_REGISTRATIONS_PER_CAMPAIGN = Number(process.env.MAX_REGISTRATIONS_PER_CAMPAIGN ?? 5000);
+const execFileAsync = promisify(execFile);
+
+let storeWriteQueue = Promise.resolve();
+const usedNonces = new Map();
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -51,12 +61,20 @@ async function writeStore(store) {
 }
 
 function sendJson(res, statusCode, payload) {
-  res.writeHead(statusCode, { "content-type": "application/json; charset=utf-8" });
+  res.writeHead(statusCode, {
+    "content-type": "application/json; charset=utf-8",
+    "x-content-type-options": "nosniff",
+    "cache-control": "no-store",
+  });
   res.end(JSON.stringify(payload));
 }
 
 function sendText(res, statusCode, text) {
-  res.writeHead(statusCode, { "content-type": "text/plain; charset=utf-8" });
+  res.writeHead(statusCode, {
+    "content-type": "text/plain; charset=utf-8",
+    "x-content-type-options": "nosniff",
+    "cache-control": "no-store",
+  });
   res.end(text);
 }
 
@@ -66,6 +84,10 @@ function isAddress(value) {
 
 function toChecksumAgnostic(value) {
   return value.toLowerCase();
+}
+
+function isTxHash(value) {
+  return typeof value === "string" && /^0x[a-fA-F0-9]{64}$/.test(value);
 }
 
 function parseUnsigned(value, fieldName, { allowZero = true } = {}) {
@@ -86,34 +108,160 @@ function parseUnsigned(value, fieldName, { allowZero = true } = {}) {
   return parsed.toString();
 }
 
+class AuthError extends Error {
+  constructor(message, statusCode = 401) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+}
+
+class HttpError extends Error {
+  constructor(message, statusCode) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+}
+
+function withStoreWriteLock(task) {
+  const run = storeWriteQueue.then(task, task);
+  storeWriteQueue = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+}
+
+function readHeader(req, name) {
+  const value = req.headers[name.toLowerCase()];
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+  return typeof value === "string" ? value : "";
+}
+
+function buildAuthMessage({ action, timestamp, nonce, body }) {
+  return [AUTH_MESSAGE_PREFIX, `action:${action}`, `timestamp:${timestamp}`, `nonce:${nonce}`, "body:", body].join("\n");
+}
+
+function pruneExpiredNonces(nowMs) {
+  for (const [key, expiresAt] of usedNonces.entries()) {
+    if (expiresAt <= nowMs) {
+      usedNonces.delete(key);
+    }
+  }
+}
+
+async function verifyWalletSignature(address, message, signature) {
+  try {
+    await execFileAsync("cast", ["wallet", "verify", "--address", address, message, signature], {
+      timeout: 8_000,
+      maxBuffer: 64 * 1024,
+    });
+    return true;
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      throw new Error("cast command not found; install Foundry to enable API signature verification");
+    }
+    return false;
+  }
+}
+
+async function requireSignedRequest(req, { expectedAddress, action, rawBody }) {
+  const signer = toChecksumAgnostic(readHeader(req, "x-auth-address"));
+  const signature = readHeader(req, "x-auth-signature");
+  const timestampRaw = readHeader(req, "x-auth-timestamp");
+  const nonce = readHeader(req, "x-auth-nonce");
+
+  if (!isAddress(signer)) {
+    throw new AuthError("missing or invalid x-auth-address");
+  }
+  if (!/^0x[a-fA-F0-9]{130}$/.test(signature)) {
+    throw new AuthError("missing or invalid x-auth-signature");
+  }
+  if (!/^\d{10}$/.test(timestampRaw)) {
+    throw new AuthError("missing or invalid x-auth-timestamp");
+  }
+  if (!/^[a-zA-Z0-9_-]{8,128}$/.test(nonce)) {
+    throw new AuthError("missing or invalid x-auth-nonce");
+  }
+
+  const timestamp = Number(timestampRaw);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (!Number.isInteger(timestamp) || Math.abs(nowSeconds - timestamp) > AUTH_MAX_SKEW_SECONDS) {
+    throw new AuthError("signature expired");
+  }
+
+  const normalizedExpected = toChecksumAgnostic(expectedAddress);
+  if (signer !== normalizedExpected) {
+    throw new AuthError("signed wallet does not match required address", 403);
+  }
+
+  const replayKey = `${signer}:${nonce}`;
+  const nowMs = Date.now();
+  pruneExpiredNonces(nowMs);
+  if (usedNonces.has(replayKey)) {
+    throw new AuthError("nonce already used");
+  }
+
+  const message = buildAuthMessage({
+    action,
+    timestamp: String(timestamp),
+    nonce,
+    body: rawBody,
+  });
+
+  const ok = await verifyWalletSignature(signer, message, signature);
+  if (!ok) {
+    throw new AuthError("invalid signature");
+  }
+
+  usedNonces.set(replayKey, nowMs + AUTH_NONCE_TTL_MS);
+  return signer;
+}
+
 async function readJsonBody(req) {
   return new Promise((resolve, reject) => {
+    let done = false;
     let size = 0;
     let body = "";
 
     req.on("data", (chunk) => {
+      if (done) {
+        return;
+      }
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
+        done = true;
         reject(new Error("request body too large"));
+        req.destroy();
         return;
       }
       body += chunk;
     });
 
     req.on("end", () => {
+      if (done) {
+        return;
+      }
+      done = true;
       if (body.length === 0) {
-        resolve({});
+        resolve({ raw: "", json: {} });
         return;
       }
 
       try {
-        resolve(JSON.parse(body));
+        resolve({ raw: body, json: JSON.parse(body) });
       } catch {
         reject(new Error("invalid JSON body"));
       }
     });
 
-    req.on("error", reject);
+    req.on("error", (error) => {
+      if (!done) {
+        done = true;
+        reject(error);
+      }
+    });
   });
 }
 
@@ -123,6 +271,12 @@ function createCampaignFromBody(body) {
 
   if (typeof body.title !== "string" || body.title.trim() === "") {
     throw new Error("title is required");
+  }
+  if (body.title.trim().length > 120) {
+    throw new Error("title is too long");
+  }
+  if (typeof body.description === "string" && body.description.length > 4000) {
+    throw new Error("description is too long");
   }
 
   if (!isAddress(body.factoryAddress) || !isAddress(body.tokenAddress) || !isAddress(body.adminAddress) || !isAddress(body.merchantAddress)) {
@@ -157,7 +311,8 @@ function createCampaignFromBody(body) {
     id,
     title: body.title.trim(),
     description: typeof body.description === "string" ? body.description.trim() : "",
-    tokenSymbol: typeof body.tokenSymbol === "string" && body.tokenSymbol.trim() !== "" ? body.tokenSymbol.trim() : "USDT",
+    tokenSymbol:
+      typeof body.tokenSymbol === "string" && body.tokenSymbol.trim() !== "" ? body.tokenSymbol.trim().slice(0, 20) : "USDT",
     tokenDecimals,
     totalCost,
     minParticipants,
@@ -251,18 +406,32 @@ async function handleApi(req, res, url) {
   }
 
   if (method === "POST" && pathname === "/api/campaigns") {
+    let bodyEnvelope;
     let campaign;
     try {
-      const body = await readJsonBody(req);
-      campaign = createCampaignFromBody(body);
+      bodyEnvelope = await readJsonBody(req);
+      campaign = createCampaignFromBody(bodyEnvelope.json);
+      await requireSignedRequest(req, {
+        expectedAddress: campaign.adminAddress,
+        action: "campaigns:create",
+        rawBody: bodyEnvelope.raw,
+      });
     } catch (error) {
-      sendJson(res, 400, { error: error instanceof Error ? error.message : "invalid request" });
+      const statusCode = error instanceof AuthError ? error.statusCode : 400;
+      sendJson(res, statusCode, { error: error instanceof Error ? error.message : "invalid request" });
       return;
     }
 
-    const store = await readStore();
-    store.campaigns.push(campaign);
-    await writeStore(store);
+    try {
+      await withStoreWriteLock(async () => {
+        const store = await readStore();
+        store.campaigns.push(campaign);
+        await writeStore(store);
+      });
+    } catch (error) {
+      sendJson(res, 500, { error: error instanceof Error ? error.message : "failed to persist campaign" });
+      return;
+    }
 
     sendJson(res, 201, { campaign: enrichCampaign(campaign) });
     return;
@@ -271,89 +440,138 @@ async function handleApi(req, res, url) {
   const registerMatch = pathname.match(/^\/api\/campaigns\/([^/]+)\/register$/);
   if (method === "POST" && registerMatch) {
     const campaignId = registerMatch[1];
+    let bodyEnvelope;
     let body;
     let approvalAmount;
     let address;
     try {
-      body = await readJsonBody(req);
+      bodyEnvelope = await readJsonBody(req);
+      body = bodyEnvelope.json;
       if (!isAddress(body.address)) {
         throw new Error("invalid address");
       }
       approvalAmount = parseUnsigned(body.approvalAmount, "approvalAmount", { allowZero: false });
       address = toChecksumAgnostic(body.address);
+      if (body.approvalTxHash !== undefined && body.approvalTxHash !== "" && !isTxHash(body.approvalTxHash)) {
+        throw new Error("approvalTxHash must be empty or a valid transaction hash");
+      }
+
+      await requireSignedRequest(req, {
+        expectedAddress: address,
+        action: `campaigns:${campaignId}:register`,
+        rawBody: bodyEnvelope.raw,
+      });
     } catch (error) {
-      sendJson(res, 400, { error: error instanceof Error ? error.message : "invalid request" });
+      const statusCode = error instanceof AuthError ? error.statusCode : 400;
+      sendJson(res, statusCode, { error: error instanceof Error ? error.message : "invalid request" });
       return;
     }
 
-    const store = await readStore();
-    const idx = store.campaigns.findIndex((item) => item.id === campaignId);
-    if (idx === -1) {
-      sendJson(res, 404, { error: "campaign not found" });
-      return;
+    try {
+      const responseCampaign = await withStoreWriteLock(async () => {
+        const store = await readStore();
+        const idx = store.campaigns.findIndex((item) => item.id === campaignId);
+        if (idx === -1) {
+          throw new HttpError("campaign not found", 404);
+        }
+
+        const campaign = store.campaigns[idx];
+        if (campaign.roundAddress) {
+          throw new HttpError("round already created, registration closed", 409);
+        }
+
+        const now = new Date().toISOString();
+        const registrations = Array.isArray(campaign.registrations) ? campaign.registrations : [];
+        const existingIdx = registrations.findIndex((item) => item.address === address);
+        const entry = {
+          address,
+          approvalAmount,
+          approvalTxHash: typeof body.approvalTxHash === "string" ? body.approvalTxHash : "",
+          registeredAt: now,
+          updatedAt: now,
+        };
+
+        if (existingIdx >= 0) {
+          registrations[existingIdx] = {
+            ...registrations[existingIdx],
+            ...entry,
+          };
+        } else {
+          if (campaign.maxParticipants !== "0" && BigInt(registrations.length + 1) > BigInt(campaign.maxParticipants)) {
+            throw new HttpError("registration exceeds campaign maxParticipants", 409);
+          }
+          if (registrations.length >= MAX_REGISTRATIONS_PER_CAMPAIGN) {
+            throw new HttpError("registration limit reached for this campaign", 409);
+          }
+          registrations.push(entry);
+        }
+
+        campaign.registrations = registrations;
+        campaign.updatedAt = now;
+        await writeStore(store);
+        return enrichCampaign(campaign);
+      });
+
+      sendJson(res, 200, { campaign: responseCampaign });
+    } catch (error) {
+      const statusCode = error instanceof HttpError ? error.statusCode : 500;
+      sendJson(res, statusCode, { error: error instanceof Error ? error.message : "failed to update registration" });
     }
-
-    const campaign = store.campaigns[idx];
-    if (campaign.roundAddress) {
-      sendJson(res, 409, { error: "round already created, registration closed" });
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const existingIdx = campaign.registrations.findIndex((item) => item.address === address);
-    const entry = {
-      address,
-      approvalAmount,
-      approvalTxHash: typeof body.approvalTxHash === "string" ? body.approvalTxHash : "",
-      registeredAt: now,
-      updatedAt: now,
-    };
-
-    if (existingIdx >= 0) {
-      campaign.registrations[existingIdx] = {
-        ...campaign.registrations[existingIdx],
-        ...entry,
-      };
-    } else {
-      campaign.registrations.push(entry);
-    }
-
-    campaign.updatedAt = now;
-    await writeStore(store);
-
-    sendJson(res, 200, { campaign: enrichCampaign(campaign) });
     return;
   }
 
   const onchainMatch = pathname.match(/^\/api\/campaigns\/([^/]+)\/mark-onchain$/);
   if (method === "POST" && onchainMatch) {
     const campaignId = onchainMatch[1];
+    let bodyEnvelope;
     let body;
     try {
-      body = await readJsonBody(req);
+      bodyEnvelope = await readJsonBody(req);
+      body = bodyEnvelope.json;
       if (!isAddress(body.roundAddress)) {
         throw new Error("invalid roundAddress");
+      }
+      if (body.roundCreateTxHash !== undefined && body.roundCreateTxHash !== "" && !isTxHash(body.roundCreateTxHash)) {
+        throw new Error("roundCreateTxHash must be empty or a valid transaction hash");
       }
     } catch (error) {
       sendJson(res, 400, { error: error instanceof Error ? error.message : "invalid request" });
       return;
     }
 
-    const store = await readStore();
-    const idx = store.campaigns.findIndex((item) => item.id === campaignId);
-    if (idx === -1) {
-      sendJson(res, 404, { error: "campaign not found" });
-      return;
+    try {
+      const responseCampaign = await withStoreWriteLock(async () => {
+        const store = await readStore();
+        const idx = store.campaigns.findIndex((item) => item.id === campaignId);
+        if (idx === -1) {
+          throw new HttpError("campaign not found", 404);
+        }
+
+        const campaign = store.campaigns[idx];
+        await requireSignedRequest(req, {
+          expectedAddress: campaign.adminAddress,
+          action: `campaigns:${campaignId}:mark-onchain`,
+          rawBody: bodyEnvelope.raw,
+        });
+
+        const normalizedRoundAddress = toChecksumAgnostic(body.roundAddress);
+        if (campaign.roundAddress && campaign.roundAddress !== normalizedRoundAddress) {
+          throw new HttpError("campaign already has a different roundAddress", 409);
+        }
+
+        campaign.roundAddress = normalizedRoundAddress;
+        campaign.roundCreateTxHash = typeof body.roundCreateTxHash === "string" ? body.roundCreateTxHash : "";
+        campaign.status = "onchain";
+        campaign.updatedAt = new Date().toISOString();
+        await writeStore(store);
+        return enrichCampaign(campaign);
+      });
+
+      sendJson(res, 200, { campaign: responseCampaign });
+    } catch (error) {
+      const statusCode = error instanceof HttpError || error instanceof AuthError ? error.statusCode : 500;
+      sendJson(res, statusCode, { error: error instanceof Error ? error.message : "failed to mark onchain" });
     }
-
-    const campaign = store.campaigns[idx];
-    campaign.roundAddress = toChecksumAgnostic(body.roundAddress);
-    campaign.roundCreateTxHash = typeof body.roundCreateTxHash === "string" ? body.roundCreateTxHash : "";
-    campaign.status = "onchain";
-    campaign.updatedAt = new Date().toISOString();
-
-    await writeStore(store);
-    sendJson(res, 200, { campaign: enrichCampaign(campaign) });
     return;
   }
 
@@ -378,7 +596,11 @@ async function serveStatic(req, res, url) {
     const data = await fs.readFile(filePath);
     const ext = path.extname(filePath);
     const contentType = MIME_TYPES[ext] ?? "application/octet-stream";
-    res.writeHead(200, { "content-type": contentType });
+    res.writeHead(200, {
+      "content-type": contentType,
+      "x-content-type-options": "nosniff",
+      "cache-control": "no-store",
+    });
     res.end(data);
   } catch {
     sendText(res, 404, "not found");
